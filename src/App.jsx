@@ -86,30 +86,27 @@ function App() {
 		run();
 	}, []);
 
-	useEffect(() => {
-		totalWaveCountHandler();
-		waversListHandler();
-	}, []);
-
 	const connectWallet = async () => {
-		setLoading(true);
 		try {
+			setLoading(true);
 			const ethereum = getEthereumObject();
 			if (!ethereum) {
 				alert('Get MetaMask!');
-				return;
+				throw new Error('MetaMask need to connect wallet!');
 			}
 
 			const accounts = await ethereum.request({
 				method: 'eth_requestAccounts',
 			});
 
-			console.log('Connected', accounts[0]);
 			setCurrentAccount(accounts[0]);
+			setLoading(false);
+			totalWaveCountHandler();
+			waversListHandler();
 		} catch (error) {
 			console.error(error);
+			setLoading(false);
 		}
-		setLoading(false);
 	};
 
 	const totalWaveCountHandler = async () => {
@@ -133,26 +130,21 @@ function App() {
 	};
 
 	const waveHandler = async () => {
-		setLoading(true);
 		try {
+			setLoading(true);
 			const wavePortalContract = await getContract();
 
 			if (wavePortalContract !== null) {
 				const waveTxn = await wavePortalContract.wave();
-				console.log('Mining...', waveTxn.hash);
-
 				await waveTxn.wait();
-				console.log('Mined -- ', waveTxn.hash);
-
-				count = await wavePortalContract.getTotalWaves();
-				console.log('Retrieved total wave count...', count.toNumber());
 				await totalWaveCountHandler();
 				await waversListHandler();
+				setLoading(false);
 			}
 		} catch (error) {
-			console.log(error);
+			setLoading(false);
+			console.error(error);
 		}
-		setLoading(false);
 	};
 
 	return (
@@ -188,7 +180,8 @@ function App() {
 							onClick={connectWallet}
 							isLoading={loading}
 						>
-							Connect Wallet
+							Connect your metamask wallet to get access to the
+							app.
 						</Button>
 					) : (
 						<Box>
@@ -243,15 +236,16 @@ function App() {
 						</Box>
 					)}
 
-					<Button
-						colorScheme='blue'
-						size='lg'
-						onClick={waveHandler}
-						disabled={!currentAccount}
-						isLoading={loading}
-					>
-						👋 Wave me back
-					</Button>
+					{currentAccount ? (
+						<Button
+							colorScheme='blue'
+							size='lg'
+							onClick={waveHandler}
+							isLoading={loading}
+						>
+							👋 Wave me back
+						</Button>
+					) : null}
 				</VStack>
 			</Container>
 		</Box>
