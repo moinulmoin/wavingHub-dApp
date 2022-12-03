@@ -14,6 +14,7 @@ import {
 	Th,
 	Td,
 	Tfoot,
+	Link,
 } from '@chakra-ui/react';
 import { ethers } from 'ethers';
 import { useEffect, useState } from 'react';
@@ -169,7 +170,7 @@ function App() {
 						This is Moinul. I am a Frontend Focused Full Stack Guy.
 						Trying to master web3. This is my first complete dApp
 						based on my own smart contract made with Solidity.
-						Connect your wallet and Wave me back 🙌
+						Connect your wallet and Wave me 🙌
 					</Text>
 
 					{!currentAccount ? (
@@ -247,6 +248,16 @@ function App() {
 						</Button>
 					) : null}
 				</VStack>
+				<Box as='footer' textAlign='center' my='10'>
+					Made with 💙 by{' '}
+					<Link
+						href='https://moinulmoin.com'
+						color='blue.500'
+						isExternal
+					>
+						Moinul Moin
+					</Link>
+				</Box>
 			</Container>
 		</Box>
 	);
