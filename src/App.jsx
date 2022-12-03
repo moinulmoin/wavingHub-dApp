@@ -5,6 +5,15 @@ import {
 	Box,
 	Text,
 	Button,
+	TableContainer,
+	Table,
+	TableCaption,
+	Thead,
+	Tbody,
+	Tr,
+	Th,
+	Td,
+	Tfoot,
 } from '@chakra-ui/react';
 import { ethers } from 'ethers';
 import { useEffect, useState } from 'react';
@@ -12,24 +21,22 @@ import ABI from './utils/WavePortal.json';
 
 const getEthereumObject = () => window.ethereum;
 
+const contractAddress = '0x7F62224f20bdD8ec9e89b8f1e6197E049fa62F30';
+const contractABI = ABI.abi;
+
 const findMetaMaskAccount = async () => {
 	try {
 		const ethereum = getEthereumObject();
 
-		/*
-		 * First make sure we have access to the Ethereum object.
-		 */
 		if (!ethereum) {
 			console.error('Make sure you have Metamask!');
 			return null;
 		}
 
-		console.log('We have the Ethereum object', ethereum);
 		const accounts = await ethereum.request({ method: 'eth_accounts' });
 
 		if (accounts.length !== 0) {
 			const account = accounts[0];
-			console.log('Found an authorized account:', account);
 			return account;
 		} else {
 			console.error('No authorized account found');
@@ -41,13 +48,51 @@ const findMetaMaskAccount = async () => {
 	}
 };
 
+const getContract = async () => {
+	try {
+		const { ethereum } = window;
+		if (ethereum) {
+			const provider = new ethers.providers.Web3Provider(ethereum);
+			const signer = provider.getSigner();
+			const wavePortalContract = new ethers.Contract(
+				contractAddress,
+				contractABI,
+				signer
+			);
+			return wavePortalContract;
+		} else {
+			return null;
+			throw new Error("Ethereum object doesn't exist!");
+		}
+	} catch (error) {
+		return null;
+		console.error(error);
+	}
+};
+
 function App() {
 	const [currentAccount, setCurrentAccount] = useState('');
+	const [loading, setLoading] = useState(false);
+	const [totalWaveCount, setTotalWaveCount] = useState(0);
+	const [allWaves, setAllWaves] = useState([]);
 
-	const contractAddress = '0x7F62224f20bdD8ec9e89b8f1e6197E049fa62F30';
-	const contractABI = ABI.abi;
+	useEffect(() => {
+		async function run() {
+			const account = await findMetaMaskAccount();
+			if (account !== null) {
+				setCurrentAccount(account);
+			}
+		}
+		run();
+	}, []);
+
+	useEffect(() => {
+		totalWaveCountHandler();
+		waversListHandler();
+	}, []);
 
 	const connectWallet = async () => {
+		setLoading(true);
 		try {
 			const ethereum = getEthereumObject();
 			if (!ethereum) {
@@ -64,27 +109,34 @@ function App() {
 		} catch (error) {
 			console.error(error);
 		}
+		setLoading(false);
 	};
 
-	const wave = async () => {
+	const totalWaveCountHandler = async () => {
 		try {
-			const { ethereum } = window;
+			const wavePortalContract = await getContract();
+			const count = await wavePortalContract.getTotalWaves();
+			setTotalWaveCount(count.toNumber());
+		} catch (error) {
+			console.error(error);
+		}
+	};
 
-			if (ethereum) {
-				const provider = new ethers.providers.Web3Provider(ethereum);
-				const signer = provider.getSigner();
-				const wavePortalContract = new ethers.Contract(
-					contractAddress,
-					contractABI,
-					signer
-				);
+	const waversListHandler = async () => {
+		try {
+			const wavePortalContract = await getContract();
+			const wavers = await wavePortalContract.getAllWavers();
+			setAllWaves(wavers);
+		} catch (error) {
+			console.error(error);
+		}
+	};
 
-				let count = await wavePortalContract.getTotalWaves();
-				console.log('Retrieved total wave count...', count.toNumber());
+	const waveHandler = async () => {
+		try {
+			const wavePortalContract = await getContract();
 
-				/*
-				 * Execute the actual wave from your smart contract
-				 */
+			if (wavePortalContract !== null) {
 				const waveTxn = await wavePortalContract.wave();
 				console.log('Mining...', waveTxn.hash);
 
@@ -93,20 +145,13 @@ function App() {
 
 				count = await wavePortalContract.getTotalWaves();
 				console.log('Retrieved total wave count...', count.toNumber());
-			} else {
-				console.log("Ethereum object doesn't exist!");
+				await totalWaveCountHandler();
+				await waversListHandler();
 			}
 		} catch (error) {
 			console.log(error);
 		}
 	};
-
-	// useEffect(async () => {
-	// 	const account = await findMetaMaskAccount();
-	// 	if (account !== null) {
-	// 		setCurrentAccount(account);
-	// 	}
-	// }, []);
 
 	return (
 		<Box
@@ -133,18 +178,73 @@ function App() {
 						Connect your wallet and Wave me back 🙌
 					</Text>
 
-					<Button
-						colorScheme='blue'
-						size='lg'
-						disabled={currentAccount}
-					>
-						{currentAccount ? 'Wallet Connected' : 'Connect Wallet'}
-					</Button>
+					{!currentAccount ? (
+						<Button
+							colorScheme='blue'
+							size='lg'
+							disabled={currentAccount}
+							onClick={connectWallet}
+							isLoading={loading}
+						>
+							Connect Wallet
+						</Button>
+					) : (
+						<Box>
+							<Text fontSize='2xl'>
+								Connected:{' '}
+								<Text as='span' color='blue.400'>
+									{currentAccount}
+								</Text>
+							</Text>
+							<Text fontSize='2xl'>
+								Total Waves:{' '}
+								<Text as='span' color='blue.400'>
+									{totalWaveCount}
+								</Text>
+							</Text>
+							<TableContainer>
+								<Table variant='simple'>
+									<TableCaption
+										placement='top'
+										fontSize='xl'
+										textColor='blue.500'
+									>
+										Wavers List
+									</TableCaption>
+									<Thead>
+										<Tr>
+											<Th textColor='blue.500'>
+												Address
+											</Th>
+											<Th textColor='blue.500' isNumeric>
+												Date-Time
+											</Th>
+										</Tr>
+									</Thead>
+									<Tbody>
+										{allWaves.length > 0 &&
+											allWaves.map((wave, index) => (
+												<Tr key={index}>
+													<Td>{wave['waver']}</Td>
+													<Td isNumeric>
+														{new Date(
+															wave[
+																'timestamp'
+															].toNumber() * 1000
+														).toLocaleString()}
+													</Td>
+												</Tr>
+											))}
+									</Tbody>
+								</Table>
+							</TableContainer>
+						</Box>
+					)}
 
 					<Button
 						colorScheme='blue'
 						size='lg'
-						onClick={wave}
+						onClick={waveHandler}
 						disabled={!currentAccount}
 					>
 						👋 Wave me back
