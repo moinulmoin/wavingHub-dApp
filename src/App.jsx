@@ -133,6 +133,7 @@ function App() {
 	};
 
 	const waveHandler = async () => {
+		setLoading(true);
 		try {
 			const wavePortalContract = await getContract();
 
@@ -151,6 +152,7 @@ function App() {
 		} catch (error) {
 			console.log(error);
 		}
+		setLoading(false);
 	};
 
 	return (
@@ -246,6 +248,7 @@ function App() {
 						size='lg'
 						onClick={waveHandler}
 						disabled={!currentAccount}
+						isLoading={loading}
 					>
 						👋 Wave me back
 					</Button>
