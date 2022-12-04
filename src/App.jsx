@@ -62,12 +62,11 @@ const getContract = async () => {
 			);
 			return wavePortalContract;
 		} else {
-			return null;
 			throw new Error("Ethereum object doesn't exist!");
 		}
 	} catch (error) {
-		return null;
 		console.error(error);
+		return null;
 	}
 };
 
@@ -76,6 +75,7 @@ function App() {
 	const [loading, setLoading] = useState(false);
 	const [totalWaveCount, setTotalWaveCount] = useState(0);
 	const [allWaves, setAllWaves] = useState([]);
+	const [network, setNetwork] = useState('');
 
 	useEffect(() => {
 		async function run() {
@@ -86,6 +86,37 @@ function App() {
 		}
 		run();
 	}, []);
+
+	useEffect(() => {
+		if (currentAccount) {
+			totalWaveCountHandler();
+			waversListHandler();
+			getNetwork();
+		}
+	}, [currentAccount]);
+
+	const getNetwork = async () => {
+		try {
+			const { ethereum } = window;
+			if (ethereum) {
+				const provider = new ethers.providers.Web3Provider(ethereum);
+				const network = await provider.getNetwork();
+				switch (network.chainId) {
+					case 1:
+						return setNetwork('ETH Mainnet');
+					case 5:
+						return setNetwork('Goerli Testnet');
+					default:
+						setNetwork('');
+						throw Error('Unknown Network');
+				}
+			} else {
+				throw new Error("Ethereum object doesn't exist!");
+			}
+		} catch (error) {
+			console.error(error);
+		}
+	};
 
 	const connectWallet = async () => {
 		try {
@@ -102,8 +133,6 @@ function App() {
 
 			setCurrentAccount(accounts[0]);
 			setLoading(false);
-			totalWaveCountHandler();
-			waversListHandler();
 		} catch (error) {
 			console.error(error);
 			setLoading(false);
@@ -113,8 +142,12 @@ function App() {
 	const totalWaveCountHandler = async () => {
 		try {
 			const wavePortalContract = await getContract();
-			const count = await wavePortalContract.getTotalWaves();
-			setTotalWaveCount(count.toNumber());
+			if (wavePortalContract !== null) {
+				const count = await wavePortalContract.getTotalWaves();
+				setTotalWaveCount(count.toNumber());
+			} else {
+				throw new Error('Contract not found!');
+			}
 		} catch (error) {
 			console.error(error);
 		}
@@ -123,8 +156,12 @@ function App() {
 	const waversListHandler = async () => {
 		try {
 			const wavePortalContract = await getContract();
-			const wavers = await wavePortalContract.getAllWavers();
-			setAllWaves(wavers);
+			if (wavePortalContract !== null) {
+				const wavers = await wavePortalContract.getAllWavers();
+				setAllWaves(wavers);
+			} else {
+				throw new Error('Contract not found!');
+			}
 		} catch (error) {
 			console.error(error);
 		}
@@ -141,6 +178,8 @@ function App() {
 				await totalWaveCountHandler();
 				await waversListHandler();
 				setLoading(false);
+			} else {
+				throw new Error('Contract not found!');
 			}
 		} catch (error) {
 			setLoading(false);
@@ -152,15 +191,16 @@ function App() {
 		<Box
 			as='main'
 			minH='100vh'
+			height='full'
 			backgroundColor='gray.900'
 			textColor='gray.100'
 		>
 			<Container maxWidth='container.xl'>
 				<VStack
-					padding={{ base: 4, lg: '10' }}
-					spacing={{ base: '14', lg: '10' }}
+					padding={{ lg: '10' }}
+					spacing={{ base: '12', lg: '8' }}
 				>
-					<Heading as='h1' size='4xl'>
+					<Heading as='h1' size='4xl' paddingY='8'>
 						👋 Hey
 					</Heading>
 					<Text
@@ -181,18 +221,28 @@ function App() {
 							onClick={connectWallet}
 							isLoading={loading}
 						>
-							Connect your metamask wallet to get access to the
-							app.
+							Connect your metamask wallet
 						</Button>
 					) : (
-						<Box>
-							<Text fontSize='2xl'>
+						<Box maxW='full'>
+							<Box
+								width='max-content'
+								marginBottom='4'
+								marginX='auto'
+								fontSize={{ base: 'lg', lg: 'xl' }}
+							>
+								Network:{' '}
+								<Box as='span' color='blue.400'>
+									{network}
+								</Box>
+							</Box>
+							<Text fontSize={{ base: 'xl', lg: '2xl' }}>
 								Connected:{' '}
 								<Text as='span' color='blue.400'>
 									{currentAccount}
 								</Text>
 							</Text>
-							<Text fontSize='2xl'>
+							<Text fontSize={{ base: 'xl', lg: '2xl' }}>
 								Total Waves:{' '}
 								<Text as='span' color='blue.400'>
 									{totalWaveCount}
@@ -204,15 +254,27 @@ function App() {
 										placement='top'
 										fontSize='xl'
 										textColor='blue.500'
+										textAlign={{
+											base: 'left',
+											lg: 'center',
+										}}
+										paddingX='2'
 									>
 										Wavers List
 									</TableCaption>
 									<Thead>
 										<Tr>
-											<Th textColor='blue.500'>
+											<Th
+												textColor='blue.500'
+												paddingX='2'
+											>
 												Address
 											</Th>
-											<Th textColor='blue.500' isNumeric>
+											<Th
+												textColor='blue.500'
+												paddingX='2'
+												isNumeric
+											>
 												Date-Time
 											</Th>
 										</Tr>
@@ -221,8 +283,10 @@ function App() {
 										{allWaves.length > 0 &&
 											allWaves.map((wave, index) => (
 												<Tr key={index}>
-													<Td>{wave['waver']}</Td>
-													<Td isNumeric>
+													<Td paddingX='2'>
+														{wave['waver']}
+													</Td>
+													<Td paddingX='2' isNumeric>
 														{new Date(
 															wave[
 																'timestamp'
@@ -243,20 +307,23 @@ function App() {
 							size='lg'
 							onClick={waveHandler}
 							isLoading={loading}
+							width='max-content'
 						>
-							👋 Wave me back
+							👋 Wave me
 						</Button>
 					) : null}
 				</VStack>
-				<Box as='footer' textAlign='center' my='10'>
-					Made with 💙 by{' '}
-					<Link
-						href='https://moinulmoin.com'
-						color='blue.500'
-						isExternal
-					>
-						Moinul Moin
-					</Link>
+				<Box as='footer' textAlign='center' paddingY='8'>
+					<Text>
+						Made with 💙 by{' '}
+						<Link
+							href='https://moinulmoin.com'
+							color='blue.500'
+							isExternal
+						>
+							Moinul Moin
+						</Link>
+					</Text>
 				</Box>
 			</Container>
 		</Box>
