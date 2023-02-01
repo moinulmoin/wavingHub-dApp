@@ -15,6 +15,11 @@ import {
 	Td,
 	Tfoot,
 	Link,
+	FormControl,
+	Input,
+	HStack,
+	InputGroup,
+	InputRightElement,
 } from '@chakra-ui/react';
 import { ethers } from 'ethers';
 import { useEffect, useState } from 'react';
@@ -22,7 +27,7 @@ import ABI from './utils/WavePortal.json';
 
 const getEthereumObject = () => window.ethereum;
 
-const contractAddress = '0x7F62224f20bdD8ec9e89b8f1e6197E049fa62F30';
+const contractAddress = '0x7331f393ADB7b3Ea61dE693D115b4c6e032Cb793';
 const contractABI = ABI.abi;
 
 const findMetaMaskAccount = async () => {
@@ -55,11 +60,7 @@ const getContract = async () => {
 		if (ethereum) {
 			const provider = new ethers.providers.Web3Provider(ethereum);
 			const signer = provider.getSigner();
-			const wavePortalContract = new ethers.Contract(
-				contractAddress,
-				contractABI,
-				signer
-			);
+			const wavePortalContract = new ethers.Contract(contractAddress, contractABI, signer);
 			return wavePortalContract;
 		} else {
 			throw new Error("Ethereum object doesn't exist!");
@@ -76,6 +77,7 @@ function App() {
 	const [totalWaveCount, setTotalWaveCount] = useState(0);
 	const [allWaves, setAllWaves] = useState([]);
 	const [network, setNetwork] = useState('');
+	const [message, setMessage] = useState('');
 
 	useEffect(() => {
 		async function run() {
@@ -157,8 +159,17 @@ function App() {
 		try {
 			const wavePortalContract = await getContract();
 			if (wavePortalContract !== null) {
-				const wavers = await wavePortalContract.getAllWavers();
-				setAllWaves(wavers);
+				const waves = await wavePortalContract.getAllWaves();
+
+				let wavesCleaned = [];
+				waves.forEach((wave) => {
+					wavesCleaned.push({
+						address: wave.waver,
+						timestamp: new Date(wave.timestamp * 1000),
+						message: wave.message,
+					});
+				});
+				setAllWaves(wavesCleaned);
 			} else {
 				throw new Error('Contract not found!');
 			}
@@ -173,10 +184,11 @@ function App() {
 			const wavePortalContract = await getContract();
 
 			if (wavePortalContract !== null) {
-				const waveTxn = await wavePortalContract.wave();
+				const waveTxn = await wavePortalContract.wave(message);
 				await waveTxn.wait();
 				await totalWaveCountHandler();
 				await waversListHandler();
+				setMessage('');
 				setLoading(false);
 			} else {
 				throw new Error('Contract not found!');
@@ -188,29 +200,16 @@ function App() {
 	};
 
 	return (
-		<Box
-			as='main'
-			minH='100vh'
-			height='full'
-			backgroundColor='gray.900'
-			textColor='gray.100'
-		>
+		<Box as='main' minH='100vh' height='full' backgroundColor='gray.900' textColor='gray.100'>
 			<Container maxWidth='container.xl'>
-				<VStack
-					padding={{ lg: '10' }}
-					spacing={{ base: '12', lg: '8' }}
-				>
+				<VStack padding={{ lg: '10' }} spacing={{ base: '12', lg: '8' }}>
 					<Heading as='h1' size='4xl' paddingY='8'>
 						👋 Hey
 					</Heading>
-					<Text
-						fontSize={{ base: 'xl', lg: '2xl' }}
-						textAlign='justify'
-					>
-						This is Moinul. I am a Frontend Focused Full Stack Guy.
-						Trying to master web3. This is my first complete dApp
-						based on my own smart contract made with Solidity.
-						Connect your wallet and Wave me 🙌
+					<Text fontSize={{ base: 'xl', lg: '2xl' }} textAlign='justify'>
+						This is Moinul. I am a Frontend Focused Full Stack Guy. Trying to master web3. This is
+						my first complete dApp based on my own smart contract made with Solidity. Connect your
+						wallet and Wave me 🙌
 					</Text>
 
 					{!currentAccount ? (
@@ -264,37 +263,39 @@ function App() {
 									</TableCaption>
 									<Thead>
 										<Tr>
-											<Th
-												textColor='blue.500'
-												paddingX='2'
-											>
+											<Th textColor='blue.500' textAlign='center' paddingX='2'>
 												Address
 											</Th>
-											<Th
-												textColor='blue.500'
-												paddingX='2'
-												isNumeric
-											>
-												Date-Time
+											<Th textColor='blue.500' textAlign='center' paddingX='2'>
+												Time
+											</Th>
+											<Th textColor='blue.500' paddingX='2' textAlign='center'>
+												Message
 											</Th>
 										</Tr>
 									</Thead>
 									<Tbody>
-										{allWaves.length > 0 &&
+										{allWaves.length > 0 ? (
 											allWaves.map((wave, index) => (
 												<Tr key={index}>
-													<Td paddingX='2'>
-														{wave['waver']}
+													<Td paddingX='2' textAlign='center'>
+														{wave.address}
 													</Td>
-													<Td paddingX='2' isNumeric>
-														{new Date(
-															wave[
-																'timestamp'
-															].toNumber() * 1000
-														).toLocaleString()}
+													<Td paddingX='2' textAlign='center'>
+														{wave.timestamp.toString()}
+													</Td>
+													<Td paddingX='2' textAlign='center'>
+														{wave.message}
 													</Td>
 												</Tr>
-											))}
+											))
+										) : (
+											<Tr>
+												<Td paddingX='2' colSpan={3} textAlign='center'>
+													No Waves found!
+												</Td>
+											</Tr>
+										)}
 									</Tbody>
 								</Table>
 							</TableContainer>
@@ -302,25 +303,35 @@ function App() {
 					)}
 
 					{currentAccount ? (
-						<Button
-							colorScheme='blue'
-							size='lg'
-							onClick={waveHandler}
-							isLoading={loading}
-							width='max-content'
-						>
-							👋 Wave me
-						</Button>
+						<Box>
+							<InputGroup size='lg'>
+								<Input
+									pr='8rem'
+									value={message}
+									onChange={(e) => setMessage(e.target.value)}
+									placeholder='Write your message here...'
+								/>
+								<InputRightElement width='6rem'>
+									<Button
+										disabled={!message}
+										type='submit'
+										h='3rem'
+										borderLeftRadius='0'
+										colorScheme='blue'
+										onClick={waveHandler}
+										isLoading={loading}
+									>
+										👋 Wave
+									</Button>
+								</InputRightElement>
+							</InputGroup>
+						</Box>
 					) : null}
 				</VStack>
 				<Box as='footer' textAlign='center' paddingY='8'>
 					<Text>
 						Made with 💙 by{' '}
-						<Link
-							href='https://moinulmoin.com'
-							color='blue.500'
-							isExternal
-						>
+						<Link href='https://moinulmoin.com' color='blue.500' isExternal>
 							Moinul Moin
 						</Link>
 					</Text>
