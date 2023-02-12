@@ -1,25 +1,25 @@
 import {
-	VStack,
+	Alert,
+	AlertIcon,
+	Box,
+	Button,
 	Container,
 	Heading,
-	Box,
-	Text,
-	Button,
-	TableContainer,
-	Table,
-	TableCaption,
-	Thead,
-	Tbody,
-	Tr,
-	Th,
-	Td,
-	Tfoot,
-	Link,
-	FormControl,
 	Input,
-	HStack,
 	InputGroup,
 	InputRightElement,
+	Link,
+	Table,
+	TableCaption,
+	TableContainer,
+	Tbody,
+	Td,
+	Text,
+	Th,
+	Thead,
+	Tr,
+	VStack,
+	useToast,
 } from '@chakra-ui/react';
 import { ethers } from 'ethers';
 import { useEffect, useState } from 'react';
@@ -27,7 +27,7 @@ import ABI from './utils/WavePortal.json';
 
 const getEthereumObject = () => window.ethereum;
 
-const contractAddress = '0x7331f393ADB7b3Ea61dE693D115b4c6e032Cb793';
+const contractAddress = '0x15f159d6B5A2DD65c7f8d6469B1De4BC223339b1';
 const contractABI = ABI.abi;
 
 const findMetaMaskAccount = async () => {
@@ -72,6 +72,7 @@ const getContract = async () => {
 };
 
 function App() {
+	const toast = useToast();
 	const [currentAccount, setCurrentAccount] = useState('');
 	const [loading, setLoading] = useState(false);
 	const [totalWaveCount, setTotalWaveCount] = useState(0);
@@ -90,12 +91,41 @@ function App() {
 	}, []);
 
 	useEffect(() => {
-		if (currentAccount) {
+		getNetwork();
+		totalWaveCountHandler();
+		waversListHandler();
+	}, []);
+
+	useEffect(() => {
+		let wavePortalContract;
+
+		const onNewWave = (from, timestamp, message) => {
+			console.log('NewWave', from, timestamp, message);
+			setAllWaves((prevState) => [
+				...prevState,
+				{
+					address: from,
+					timestamp: new Date(timestamp * 1000),
+					message: message,
+				},
+			]);
 			totalWaveCountHandler();
-			waversListHandler();
-			getNetwork();
+		};
+
+		if (window.ethereum) {
+			const provider = new ethers.providers.Web3Provider(window.ethereum);
+			const signer = provider.getSigner();
+
+			wavePortalContract = new ethers.Contract(contractAddress, contractABI, signer);
+			wavePortalContract.on('NewWave', onNewWave);
 		}
-	}, [currentAccount]);
+
+		return () => {
+			if (wavePortalContract) {
+				wavePortalContract.off('NewWave', onNewWave);
+			}
+		};
+	}, []);
 
 	const getNetwork = async () => {
 		try {
@@ -110,9 +140,11 @@ function App() {
 						return setNetwork('Goerli Testnet');
 					default:
 						setNetwork('');
+						toast({ title: 'Unknown Network', status: 'error', position: 'top-right' });
 						throw Error('Unknown Network');
 				}
 			} else {
+				toast({ title: "Ethereum object doesn't exist!", status: 'error', position: 'top-right' });
 				throw new Error("Ethereum object doesn't exist!");
 			}
 		} catch (error) {
@@ -125,8 +157,12 @@ function App() {
 			setLoading(true);
 			const ethereum = getEthereumObject();
 			if (!ethereum) {
-				alert('Get MetaMask!');
-				throw new Error('MetaMask need to connect wallet!');
+				toast({
+					title: 'MetaMask need to connect wallet, Get MetaMask First!',
+					status: 'error',
+					position: 'top-right',
+				});
+				throw new Error('MetaMask need to connect wallet, Get MetaMask First!');
 			}
 
 			const accounts = await ethereum.request({
@@ -148,6 +184,7 @@ function App() {
 				const count = await wavePortalContract.getTotalWaves();
 				setTotalWaveCount(count.toNumber());
 			} else {
+				toast({ title: 'Contract not found!', status: 'error', position: 'top-right' });
 				throw new Error('Contract not found!');
 			}
 		} catch (error) {
@@ -171,6 +208,7 @@ function App() {
 				});
 				setAllWaves(wavesCleaned);
 			} else {
+				toast({ title: 'Contract not found!', status: 'error', position: 'top-right' });
 				throw new Error('Contract not found!');
 			}
 		} catch (error) {
@@ -186,8 +224,6 @@ function App() {
 			if (wavePortalContract !== null) {
 				const waveTxn = await wavePortalContract.wave(message);
 				await waveTxn.wait();
-				await totalWaveCountHandler();
-				await waversListHandler();
 				setMessage('');
 				setLoading(false);
 			} else {
@@ -196,11 +232,24 @@ function App() {
 		} catch (error) {
 			setLoading(false);
 			console.error(error);
+			if (error.message.includes('You must wait')) {
+				toast({
+					title: 'Please wait 60 seconds after waving once!',
+					status: 'error',
+					position: 'top-right',
+				});
+			}
 		}
 	};
 
 	return (
 		<Box as='main' minH='100vh' height='full' backgroundColor='gray.900' textColor='gray.100'>
+			{!network.includes('Goerli') && (
+				<Alert status='warning' textColor='gray.900' justifyContent='center'>
+					<AlertIcon />
+					Be careful, only login with goerli testnet. This is a testnet project. Thank you.
+				</Alert>
+			)}
 			<Container maxWidth='container.xl'>
 				<VStack padding={{ lg: '10' }} spacing={{ base: '12', lg: '8' }}>
 					<Heading as='h1' size='4xl' paddingY='8'>
